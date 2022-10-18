@@ -9,4 +9,9 @@ describe('ConfigStore', () => {
       sentryUrl: 'https://sentry.io',
     });
   });
+
+  it('should have customerDomain', () => {
+    const customerDomain = ConfigStore.get('customerDomain');
+    expect(customerDomain).toEqual('foobar');
+  });
 });
