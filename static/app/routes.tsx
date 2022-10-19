@@ -1199,7 +1199,7 @@ function buildRoutes() {
       </Route>
       <Route
         path="/organizations/:orgId/discover/"
-        component={make(() => import('sentry/views/eventsV2'))}
+        component={withCustomerDomain(make(() => import('sentry/views/eventsV2')))}
         key="org-discover-route"
       >
         {discoverChildRoutes}
