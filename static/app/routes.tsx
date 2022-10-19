@@ -1,4 +1,4 @@
-import React, {Fragment} from 'react';
+import React, {Fragment, useContext} from 'react';
 import {
   IndexRedirect,
   IndexRoute as BaseIndexRoute,
@@ -20,10 +20,12 @@ import HookStore from 'sentry/stores/hookStore';
 import {HookName} from 'sentry/types/hooks';
 import errorHandler from 'sentry/utils/errorHandler';
 import recreateRoute from 'sentry/utils/recreateRoute';
+import replaceRouterParams from 'sentry/utils/replaceRouterParams';
 import App from 'sentry/views/app';
 import AuthLayout from 'sentry/views/auth/layout';
 import IssueListContainer from 'sentry/views/issueList/container';
 import IssueListOverview from 'sentry/views/issueList/overview';
+import {OrganizationContext} from 'sentry/views/organizationContext';
 import OrganizationContextContainer from 'sentry/views/organizationContextContainer';
 import OrganizationDetails from 'sentry/views/organizationDetails';
 import {Tab, TabPaths} from 'sentry/views/organizationGroupDetails/types';
@@ -1883,6 +1885,61 @@ function withOrgSlugless<P extends RouteComponentProps<{}, {}>>(
     }
 
     return <WrappedComponent {...props} params={newParams} />;
+  };
+}
+
+function withCustomerDomain<P extends RouteComponentProps<{}, {}>>(
+  WrappedComponent: RouteComponent
+) {
+  return function WithCustomerDomainWrapper(props: P) {
+    const {customerDomain, links} = window.__initialData;
+    const {sentryUrl} = links;
+    const currentOrganization = useContext(OrganizationContext);
+
+    if (customerDomain) {
+      // Customer domain is being used on a route that has an :orgId parameter.
+      const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const redirectURL = `${trimEnd(sentryUrl, '/')}/${trimStart(redirectPath, '/')}`;
+
+      if (currentOrganization) {
+        if (
+          currentOrganization.slug !== customerDomain ||
+          !currentOrganization.features.includes('customer-domains')
+        ) {
+          window.location.replace(redirectURL);
+          return null;
+        }
+
+        const {organizationUrl} = currentOrganization.links;
+
+        const {params, routes} = props;
+
+        // Regenerate the full route with the :orgId parameter omitted.
+        const newParams = {...params};
+        Object.keys(params).forEach(param => {
+          newParams[param] = `:${param}`;
+        });
+        const fullRoute = recreateRoute('', {routes, params: newParams});
+        const orglessSlugRoute = fullRoute
+          .replace(/organizations\/:orgId\/?/, '')
+          .replace(/:orgId\/?/, '');
+
+        const orglessRedirectPath = replaceRouterParams(orglessSlugRoute, params);
+        const redirectOrgURL = `${trimEnd(organizationUrl, '/')}/${trimStart(
+          orglessRedirectPath,
+          '/'
+        )}${window.location.search}${window.location.hash}`;
+
+        // Redirect to an orgless route path.
+        window.location.replace(redirectOrgURL);
+        return null;
+      }
+
+      window.location.replace(redirectURL);
+      return null;
+    }
+
+    return <WrappedComponent {...props} />;
   };
 }
 
