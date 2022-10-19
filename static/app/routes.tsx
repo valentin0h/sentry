@@ -220,7 +220,9 @@ function buildRoutes() {
         <IndexRedirect to="welcome/" />
         <Route
           path=":step/"
-          component={make(() => import('sentry/views/onboarding/onboarding'))}
+          component={withCustomerDomain(
+            make(() => import('sentry/views/onboarding/onboarding'))
+          )}
         />
       </Route>
     </Fragment>
