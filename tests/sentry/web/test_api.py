@@ -99,6 +99,7 @@ class ClientConfigViewTest(TestCase):
         data = json.loads(resp.content)
         assert not data["isAuthenticated"]
         assert data["user"] is None
+        assert data["customerDomain"] is None
 
     def test_authenticated(self):
         user = self.create_user("foo@example.com")
@@ -112,6 +113,7 @@ class ClientConfigViewTest(TestCase):
         assert data["isAuthenticated"]
         assert data["user"]
         assert data["user"]["email"] == user.email
+        assert data["customerDomain"] is None
 
     def test_superuser(self):
         user = self.create_user("foo@example.com", is_superuser=True)
@@ -466,3 +468,22 @@ class ClientConfigViewTest(TestCase):
                 "regionUrl": "http://foobar.us.testserver",
                 "sentryUrl": "http://testserver",
             }
+
+    def test_customer_domain(self):
+        # With customer domain
+        resp = self.client.get(self.path, HTTP_HOST="albertos-apples.testserver")
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == "application/json"
+
+        data = json.loads(resp.content)
+        assert not data["isAuthenticated"]
+        assert data["customerDomain"] == "albertos-apples"
+
+        # Without customer domain
+        resp = self.client.get(self.path, HTTP_HOST="testserver")
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == "application/json"
+
+        data = json.loads(resp.content)
+        assert not data["isAuthenticated"]
+        assert data["customerDomain"] is None
