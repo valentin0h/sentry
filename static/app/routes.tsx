@@ -199,6 +199,21 @@ function buildRoutes() {
         component={make(() => import('sentry/views/organizationJoinRequest'))}
       />
       <Route
+        path="/onboarding/"
+        component={errorHandler(
+          withOrgSlugless(OrganizationContextContainer, {
+            path: '/onboarding/',
+            redirectPath: '/onboarding/:orgId/',
+          })
+        )}
+        key="orgless-onboarding"
+      >
+        <Route
+          path=":step/"
+          component={make(() => import('sentry/views/onboarding/onboarding'))}
+        />
+      </Route>
+      <Route
         path="/onboarding/:orgId/"
         component={errorHandler(OrganizationContextContainer)}
       >
