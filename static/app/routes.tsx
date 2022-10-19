@@ -1,13 +1,17 @@
-import {Fragment} from 'react';
+import React, {Fragment} from 'react';
 import {
   IndexRedirect,
   IndexRoute as BaseIndexRoute,
   IndexRouteProps,
   Redirect,
   Route as BaseRoute,
+  RouteComponent,
+  RouteComponentProps,
   RouteProps,
 } from 'react-router';
 import memoize from 'lodash/memoize';
+import trimEnd from 'lodash/trimEnd';
+import trimStart from 'lodash/trimStart';
 
 import LazyLoad from 'sentry/components/lazyLoad';
 import {EXPERIMENTAL_SPA} from 'sentry/constants';
@@ -15,6 +19,7 @@ import {t} from 'sentry/locale';
 import HookStore from 'sentry/stores/hookStore';
 import {HookName} from 'sentry/types/hooks';
 import errorHandler from 'sentry/utils/errorHandler';
+import recreateRoute from 'sentry/utils/recreateRoute';
 import App from 'sentry/views/app';
 import AuthLayout from 'sentry/views/auth/layout';
 import IssueListContainer from 'sentry/views/issueList/container';
@@ -1818,6 +1823,67 @@ function buildRoutes() {
   );
 
   return appRoutes;
+}
+
+type withOrgSluglessOptions = {
+  path: string;
+  redirectPath: string;
+};
+
+function withOrgSlugless<P extends RouteComponentProps<{}, {}>>(
+  WrappedComponent: RouteComponent,
+  options: withOrgSluglessOptions
+) {
+  return function withOrgSluglessWrapper(props: P) {
+    const {routes, params} = props;
+    const {features, customerDomain} = window.__initialData;
+    const {sentryUrl} = window.__initialData.links;
+
+    if (!customerDomain) {
+      // This route should only be accessed if a customer domain is used.
+      // We redirect the user to the sentryUrl.
+      window.location.replace(sentryUrl);
+      return null;
+    }
+
+    const newParams = {
+      ...params,
+      orgId: customerDomain,
+    };
+
+    const hasCustomerDomain = (features as unknown as string[]).includes(
+      'organizations:customer-domains'
+    );
+
+    if (!hasCustomerDomain) {
+      const routeIndex = routes.findIndex(r => {
+        return r.path === options.path;
+      });
+      if (routeIndex < 0) {
+        // If this occurs, then it's a bug in routes.tsx, and the arguments to withOrgSlugless() are not properly set.
+        window.location.replace(sentryUrl);
+        return null;
+      }
+
+      const newRoutes = [...routes];
+      newRoutes[routeIndex] = {
+        ...routes[routeIndex],
+        path: options.redirectPath,
+      };
+
+      const redirectPath = recreateRoute('', {
+        routes: newRoutes,
+        params: newParams,
+        location: window.location as any,
+      });
+
+      const redirectURL = `${trimEnd(sentryUrl, '/')}/${trimStart(redirectPath, '/')}`;
+      window.location.replace(redirectURL);
+      return null;
+    }
+
+    return <WrappedComponent {...props} params={newParams} />;
+  };
 }
 
 // We load routes both when initlaizing the SDK (for routing integrations) and
